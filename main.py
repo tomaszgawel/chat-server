@@ -1,18 +1,15 @@
 import asyncio
-import socket
 import ssl
-import traceback
-from _thread import start_new_thread
 
 host = "localhost"
 port = 8889
 
-client_sockets = []
-client_hashmap = {} #"ip": "login"
+writers = []
+client_dict = {} #"ip": "login"
 
 server_cert = 'server.crt'
 server_key = 'server.key'
-client_certs = 'client.crt'
+client_certs = 'client.crt' # might not be needed
 
 
 def get_ssl_context():
@@ -22,33 +19,34 @@ def get_ssl_context():
     context.load_verify_locations(cafile=client_certs)
     return context
 
-def get_server_socket():
-    server_socket = socket.socket()
-    server_socket.bind((host, port))
-    server_socket.listen(5)
-    return server_socket
+# named in honor of its predecessor
+# https://github.com/akulinski/ChatRoomServer
+def pass_massage(message):
+    for w in writers:
+        # to be changed for protocol handling
+        w.write(message.encode())
 
-def get_client_data(conn):
-    #function to change when protocol works
-    return conn.recv(1024).decode()
 
-def handle_client(conn, addr):
-    data = get_client_data(conn)
-    print(data)
-    #checking type of data and handle specific request
+async def handle_connection(reader, writer):
+    writers.append(writer)
+    addr = writer.get_extra_info('peername')
+    print(str(addr) + " connected")
+    while True:
+        data = await reader.read(100)
+        pass_massage(data.decode())
+        await writer.drain()
+
 
 async def run_server():
-    context = get_ssl_context()
-    server_socket = get_server_socket()
-    while True:
-        try:
-            c, addr = server_socket.accept()
-            conn = context.wrap_socket(c, server_side=True)
-            client_sockets.append(conn)
-            print('Connected to :', addr[0], ':', addr[1])
-            start_new_thread(handle_client, (conn, addr,))
-        except socket.error as e:
-            traceback.print_tb(e)
+    server = await asyncio.start_server(
+         handle_connection,
+         host,
+         port,
+         #ssl=get_ssl_context() # disabled for testing only
+    )
+    addr = server.sockets[0].getsockname()
+    print("Serving on " + str(addr))
+    async with server:
+        await server.serve_forever()
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(run_server())
+asyncio.run(run_server())
