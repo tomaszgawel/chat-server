@@ -7,12 +7,12 @@ host = "localhost"
 port = 8889
 
 writers = []
-client_dict = {}  # "ip": "login"
+logins = []
 
 
 server_cert = 'server.crt'
 server_key = 'server.key'
-client_certs = 'client.crt'  # might not be needed
+client_certs = 'client.crt'
 
 
 def get_ssl_context():
@@ -50,21 +50,39 @@ async def get_data_from_client(reader):
     return data.decode()
 
 
+def check_if_login_exist(login):
+    if not login in logins:
+        return event_types.CODE_ACCEPT
+    else:
+        return event_types.CODE_REJECT
+
+
 async def handle_connection(reader, writer):
-    writers.append(writer)
     addr = writer.get_extra_info('peername')
     print(str(addr) + " connected")
 
     while True:
-        data = await get_data_from_client(reader)
-        event = event_parser.EventParser().parse_string_to_event(data)
+        try:
+            data = await get_data_from_client(reader)
+            event = event_parser.EventParser().parse_string_to_event(data)
+        except IndexError:
+            await writer.drain()
+            continue
 
         if event.event_type == event_types.MESSAGE_REQUEST:
             await pass_massage(data)
+
         elif event.event_type == event_types.LOGIN_REQUEST:
-            await send_data_to_client(writer, data)
+            login_response = event_types.LoginResponse(check_if_login_exist(event.login))
+
+            if login_response.code == event_types.CODE_ACCEPT:
+                writers.append(writer)
+                logins.append(event.login)
+
+            await send_data_to_client(writer, login_response.convert_to_string())
+
         else:
-            await pass_massage("mordo ja nie wiem")
+            await send_data_to_client(writer, "mordo ja nie wiem")
 
         await writer.drain()
 
