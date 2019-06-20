@@ -23,7 +23,7 @@ def periodic_online_task():
         print('hej')
         online_req = event_types.OnlineRequest()
         print(online_store.user_writer_map.keys())
-        online_req.new_online_users_list(online_store.user_writer_map.keys())
+        online_req.new_online_users_list(list(online_store.user_writer_map))
         req_string = online_req.convert_to_string()
         for wr in online_store.user_writer_map.values():
             print(req_string)
