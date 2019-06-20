@@ -1,18 +1,34 @@
 import asyncio
 import ssl
+import threading
+from time import sleep
+
 import event_parser
 import event_types
+
+from online_handler import UserStore
 
 host = "localhost"
 port = 8889
 
-writers = []
-logins = []
-
-
 server_cert = 'server.crt'
 server_key = 'server.key'
 client_certs = 'client.crt'
+
+online_store = UserStore()
+
+
+def periodic_online_task():
+    while True:
+        print('hej')
+        online_req = event_types.OnlineRequest()
+        print(online_store.user_writer_map.keys())
+        online_req.new_online_users_list(online_store.user_writer_map.keys())
+        req_string = online_req.convert_to_string()
+        for wr in online_store.user_writer_map.values():
+            print(req_string)
+            wr.write(req_string.encode())
+        sleep(1)
 
 
 def get_ssl_context():
@@ -30,7 +46,7 @@ def get_ssl_context():
 # it writes the DATA (not only messages) to all clients
 # its name confusing as we all are
 async def pass_massage(message):
-    for w in writers:
+    for w in online_store.user_writer_map.values():
         w.write(message.encode())
 
 
@@ -50,13 +66,6 @@ async def get_data_from_client(reader):
     return data.decode()
 
 
-def check_if_login_exist(login):
-    if not login in logins:
-        return event_types.CODE_ACCEPT
-    else:
-        return event_types.CODE_REJECT
-
-
 async def handle_connection(reader, writer):
     addr = writer.get_extra_info('peername')
     print(str(addr) + " connected")
@@ -65,8 +74,9 @@ async def handle_connection(reader, writer):
         try:
             data = await get_data_from_client(reader)
             event = event_parser.EventParser().parse_string_to_event(data)
-        except IndexError:
+        except (IndexError, ValueError):
             await writer.drain()
+            online_store.remove_by_writer(writer)
             continue
 
         if event.event_type == event_types.MESSAGE_REQUEST:
@@ -75,11 +85,18 @@ async def handle_connection(reader, writer):
 
         elif event.event_type == event_types.LOGIN_REQUEST:
             print(data)
-            login_response = event_types.LoginResponse(check_if_login_exist(event.login))
+
+            code = ''
+
+            if not online_store.check_if_online(event.login):
+                code = event_types.CODE_ACCEPT
+            else:
+                code = event_types.CODE_REJECT
+
+            login_response = event_types.LoginResponse(code)
 
             if login_response.code == event_types.CODE_ACCEPT:
-                writers.append(writer)
-                logins.append(event.login)
+                online_store.add_new_user(event.login, writer)
 
             await send_data_to_client(writer, login_response.convert_to_string())
 
@@ -91,10 +108,10 @@ async def handle_connection(reader, writer):
 
 async def run_server():
     server = await asyncio.start_server(
-         handle_connection,
-         host,
-         port,
-         #ssl=get_ssl_context() # disabled for testing only
+        handle_connection,
+        host,
+        port,
+        # ssl=get_ssl_context() # disabled for testing only
     )
 
     addr = server.sockets[0].getsockname()
@@ -103,4 +120,6 @@ async def run_server():
     async with server:
         await server.serve_forever()
 
+
+threading.Thread(target=periodic_online_task).start()
 asyncio.run(run_server())
