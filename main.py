@@ -70,9 +70,11 @@ async def handle_connection(reader, writer):
             continue
 
         if event.event_type == event_types.MESSAGE_REQUEST:
+            print(data)
             await pass_massage(data)
 
         elif event.event_type == event_types.LOGIN_REQUEST:
+            print(data)
             login_response = event_types.LoginResponse(check_if_login_exist(event.login))
 
             if login_response.code == event_types.CODE_ACCEPT:
