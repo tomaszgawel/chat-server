@@ -13,14 +13,12 @@ port = 8889
 
 server_cert = 'server.crt'
 server_key = 'server.key'
-client_certs = 'client.crt'
 
 online_store = UserStore()
 
 
 def periodic_online_task():
     while True:
-        print('hej')
         online_req = event_types.OnlineRequest()
         print(online_store.user_writer_map.keys())
         online_req.new_online_users_list(list(online_store.user_writer_map))
@@ -32,12 +30,9 @@ def periodic_online_task():
 
 
 def get_ssl_context():
-    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    context.verify_mode = ssl.CERT_REQUIRED
-
+    context = ssl.create_default_context()
+    context.verify_mode = ssl.CERT_OPTIONAL
     context.load_cert_chain(certfile=server_cert, keyfile=server_key)
-    context.load_verify_locations(cafile=client_certs)
-
     return context
 
 
@@ -111,7 +106,7 @@ async def run_server():
         handle_connection,
         host,
         port,
-        # ssl=get_ssl_context() # disabled for testing only
+        ssl=get_ssl_context()
     )
 
     addr = server.sockets[0].getsockname()
