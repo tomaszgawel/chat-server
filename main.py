@@ -20,11 +20,9 @@ online_store = UserStore()
 def periodic_online_task():
     while True:
         online_req = event_types.OnlineRequest()
-        print(online_store.user_writer_map.keys())
         online_req.new_online_users_list(list(online_store.user_writer_map))
         req_string = online_req.convert_to_string()
         for wr in online_store.user_writer_map.values():
-            print(req_string)
             wr.write(req_string.encode())
         sleep(1)
 
@@ -69,10 +67,14 @@ async def handle_connection(reader, writer):
         try:
             data = await get_data_from_client(reader)
             event = event_parser.EventParser().parse_string_to_event(data)
-        except (IndexError, ValueError):
-            await writer.drain()
-            online_store.remove_by_writer(writer)
-            continue
+        except (IndexError, ValueError) as e:
+            removed_username = online_store.remove_by_writer(writer)
+            if not removed_username == None:
+                print("removing: "+ str(removed_username))
+                writer.close()
+                message = event_types.MessageRequest("SERVER", removed_username+ " disconnected")
+                await pass_massage(message.convert_to_string())
+            break
 
         if event.event_type == event_types.MESSAGE_REQUEST:
             print(data)
