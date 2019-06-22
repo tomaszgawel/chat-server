@@ -97,6 +97,13 @@ async def handle_connection(reader, writer):
 
             await send_data_to_client(writer, login_response.convert_to_string())
 
+        elif event.event_type == event_types.LOGOUT_REQUEST:
+            print(data)
+            removed_username = online_store.remove_by_writer(writer)
+            if not removed_username == None:
+                print("removing: "+ str(removed_username))
+                message = event_types.MessageRequest("SERVER", removed_username+ " disconnected")
+                await pass_massage(message.convert_to_string())
         else:
             await send_data_to_client(writer, "mordo ja nie wiem")
 
