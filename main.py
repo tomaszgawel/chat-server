@@ -8,7 +8,7 @@ import event_types
 
 from online_handler import UserStore
 
-host = "localhost"
+host = "0.0.0.0"
 port = 8889
 
 server_cert = 'server.crt'
@@ -94,6 +94,8 @@ async def handle_connection(reader, writer):
 
             if login_response.code == event_types.CODE_ACCEPT:
                 online_store.add_new_user(event.login, writer)
+                message = event_types.MessageRequest("SERVER", event.login+ " connected")
+                await pass_massage(message.convert_to_string())
 
             await send_data_to_client(writer, login_response.convert_to_string())
 
@@ -101,7 +103,7 @@ async def handle_connection(reader, writer):
             print(data)
             removed_username = online_store.remove_by_writer(writer)
             if not removed_username == None:
-                print("removing: "+ str(removed_username))
+                print("loging out: "+ str(removed_username))
                 message = event_types.MessageRequest("SERVER", removed_username+ " disconnected")
                 await pass_massage(message.convert_to_string())
         else:
