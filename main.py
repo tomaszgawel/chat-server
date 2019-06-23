@@ -82,7 +82,6 @@ async def handle_connection(reader, writer):
             await pass_massage(data)
 
         elif event.event_type == event_types.LOGIN_REQUEST:
-            print(data)
 
             code = ''
 
@@ -101,7 +100,6 @@ async def handle_connection(reader, writer):
             await send_data_to_client(writer, login_response.convert_to_string())
 
         elif event.event_type == event_types.LOGOUT_REQUEST:
-            print(data)
             removed_username = online_store.remove_by_writer(writer)
             if not removed_username == None:
                 logging.info("LOGGING OUT: "+ str(removed_username))
@@ -122,7 +120,7 @@ async def run_server():
     )
 
     addr = server.sockets[0].getsockname()
-    print("Serving on " + str(addr))
+    logging.info("Serving on " + str(addr))
 
     async with server:
         await server.serve_forever()
