@@ -1,6 +1,7 @@
 import asyncio
 import ssl
 import threading
+import logging
 from time import sleep
 
 import event_parser
@@ -39,11 +40,13 @@ def get_ssl_context():
 # it writes the DATA (not only messages) to all clients
 # its name confusing as we all are
 async def pass_massage(message):
+    logging.info("SENDING TO ALL USERS: "+message)
     for w in online_store.user_writer_map.values():
         w.write(message.encode())
 
 
 async def send_data_to_client(client_writer, message):
+    logging.info(message)
     client_writer.write(message.encode())
 
 
@@ -55,14 +58,13 @@ async def get_data_from_client(reader):
     while read_size < length:
         data += await reader.read(1024)
         read_size += 1024
-
+    logging.info("RECIEVED: "+data.decode())
     return data.decode()
 
 
 async def handle_connection(reader, writer):
     addr = writer.get_extra_info('peername')
-    print(str(addr) + " connected")
-
+    logging.info(str(addr) + " connected")
     while True:
         try:
             data = await get_data_from_client(reader)
@@ -70,14 +72,13 @@ async def handle_connection(reader, writer):
         except (IndexError, ValueError) as e:
             removed_username = online_store.remove_by_writer(writer)
             if not removed_username == None:
-                print("removing: "+ str(removed_username))
+                logging.info("REMOVING: "+ str(removed_username))
                 writer.close()
                 message = event_types.MessageRequest("SERVER", removed_username+ " disconnected")
                 await pass_massage(message.convert_to_string())
             break
 
         if event.event_type == event_types.MESSAGE_REQUEST:
-            print(data)
             await pass_massage(data)
 
         elif event.event_type == event_types.LOGIN_REQUEST:
@@ -103,7 +104,7 @@ async def handle_connection(reader, writer):
             print(data)
             removed_username = online_store.remove_by_writer(writer)
             if not removed_username == None:
-                print("loging out: "+ str(removed_username))
+                logging.info("LOGGING OUT: "+ str(removed_username))
                 message = event_types.MessageRequest("SERVER", removed_username+ " disconnected")
                 await pass_massage(message.convert_to_string())
         else:
@@ -126,6 +127,6 @@ async def run_server():
     async with server:
         await server.serve_forever()
 
-
+logging.basicConfig(level=logging.DEBUG)
 threading.Thread(target=periodic_online_task).start()
 asyncio.run(run_server())
