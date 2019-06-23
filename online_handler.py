@@ -14,6 +14,7 @@ class UserStore:
         return user_name in self.user_writer_map.keys()
 
     def remove_by_writer(self, writer):
-        for user_name, wr in self.user_writer_map.values():
+        for user_name, wr in self.user_writer_map.items():
             if wr == writer:
                 del self.user_writer_map[user_name]
+                return user_name
